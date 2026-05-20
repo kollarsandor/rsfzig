@@ -99,19 +99,19 @@ theorem map_comp (r : RSFResult α) (f : α → β) (g : β → γ) :
   | ok _ => rfl
   | err _ => rfl
 
-theorem err_ne_ok (e : RSFError) (a : α) [DecidableEq α] :
+theorem err_ne_ok (e : RSFError) (a : α) :
     (err e : RSFResult α) ≠ ok a :=
-  fun h => RSFResult.noConfusion h
+  nofun
 
-theorem ok_ne_err (a : α) (e : RSFError) [DecidableEq α] :
+theorem ok_ne_err (a : α) (e : RSFError) :
     (ok a : RSFResult α) ≠ err e :=
-  fun h => RSFResult.noConfusion h
+  nofun
 
 theorem ok_injective (a b : α) (h : (ok a : RSFResult α) = ok b) : a = b :=
-  RSFResult.noConfusion h fun h => h
+  RSFResult.ok.inj h
 
 theorem err_injective (e1 e2 : RSFError) (h : (err e1 : RSFResult α) = err e2) : e1 = e2 :=
-  RSFResult.noConfusion h fun h => h
+  RSFResult.err.inj h
 
 theorem bind_preserves_err (r : RSFResult α) (f : α → RSFResult β) (e : RSFError)
     (h : r = err e) : bind r f = err e :=
@@ -308,13 +308,13 @@ theorem length_nil : ([] : List α).length = 0 := rfl
 theorem length_cons (a : α) (l : List α) : (a :: l).length = l.length + 1 := rfl
 
 theorem length_append (l1 l2 : List α) : (l1 ++ l2).length = l1.length + l2.length :=
-  List.length_append l1 l2
+  List.length_append
 
 theorem length_map {α β : Type} (f : α → β) (l : List α) :
-    (l.map f).length = l.length := List.length_map l f
+    (l.map f).length = l.length := List.length_map _
 
 theorem length_replicate (n : Nat) (a : α) : (List.replicate n a).length = n :=
-  List.length_replicate n a
+  List.length_replicate
 
 theorem map_nil (f : α → β) : ([] : List α).map f = [] := rfl
 
@@ -323,7 +323,7 @@ theorem map_cons (f : α → β) (a : α) (l : List α) :
 
 theorem map_map (f : α → β) (g : β → γ) (l : List α) :
     (l.map f).map g = l.map (g ∘ f) :=
-  List.map_map g f l
+  List.map_map ..
 
 theorem map_id_ext (l : List α) : l.map id = l :=
   List.map_id l
@@ -384,7 +384,7 @@ theorem drop_nil (n : Nat) : drop n ([] : List α) = [] :=
   | _ + 1 => rfl
 
 theorem length_take_le {α : Type} (l : List α) (n : Nat) :
-    (l.take n).length = min n l.length := List.length_take n l
+    (l.take n).length = min n l.length := List.length_take ..
 
 def setAt : List α → Nat → α → List α
   | [], _, _ => []
@@ -1108,7 +1108,7 @@ def zeroTensorVal (ni : NumericInterface) (tv : TensorVal ni) : TensorVal ni :=
     data := List.replicate tv.data.length ni.zero
     storageId := tv.storageId
     storageOffset := tv.storageOffset
-    hDataLen := (List.length_replicate tv.data.length ni.zero).trans tv.hDataLen }
+    hDataLen := List.length_replicate.trans tv.hDataLen }
 
 open NumericSem TensorDef ShapeDef in
 theorem zeroTensorVal_preserves_shape (ni : NumericInterface) (tv : TensorVal ni) :
@@ -1121,7 +1121,7 @@ theorem zeroTensorVal_preserves_storageId (ni : NumericInterface) (tv : TensorVa
 open NumericSem TensorDef ShapeDef in
 theorem zeroTensorVal_preserves_dataLen (ni : NumericInterface) (tv : TensorVal ni) :
     (zeroTensorVal ni tv).data.length = tv.data.length :=
-  List.length_replicate tv.data.length ni.zero
+  List.length_replicate
 
 open NumericSem TensorDef ShapeDef in
 def cloneTensorVal (ni : NumericInterface) (tv : TensorVal ni) (newSid : Nat) : TensorVal ni :=
@@ -1293,7 +1293,7 @@ def mkZeroGrad (ni : NumericInterface) (shape : Shape) : TensorVal ni :=
     data := List.replicate shape.totalSize ni.zero
     storageId := 0
     storageOffset := 0
-    hDataLen := List.length_replicate shape.totalSize ni.zero }
+    hDataLen := List.length_replicate }
 
 open NumericSem TensorMem ShapeDef in
 def optionOrSome (opt : Option α) (fallback : α) : Option α :=
@@ -1410,7 +1410,7 @@ def initOwned (ni : NumericInterface) (spec : InitOwnedSpec ni) : LayerCore ni :
       data := List.replicate shape.totalSize ni.zero
       storageId := spec.seedOffset
       storageOffset := 0
-      hDataLen := List.length_replicate shape.totalSize ni.zero }
+      hDataLen := List.length_replicate }
   { s_weight := mkTensor (mkShape2D spec.dim spec.dim)
     t_weight := mkTensor (mkShape2D spec.dim spec.dim)
     s_bias := mkTensor (mkShape2D 1 spec.dim)
@@ -1465,7 +1465,7 @@ theorem initOwned_grad_mean (ni : NumericInterface) (spec : InitOwnedSpec ni) :
 
 open NumericSem in
 theorem validatePair (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 end LayerCoreDef
 
@@ -1788,7 +1788,7 @@ def backwardFromOutputsRow (ni : NumericInterface) (lc : LayerCore ni)
   let updatedLc := lc
   let hDxLen : dx1_row.length = dim :=
     show (List.range dim |>.map _).length = dim from
-    (List.length_map (List.range dim) _).trans (List.length_range dim)
+    (List.length_map _).trans (List.length_range)
   ({ x1_row := inp.y1_row, x2_row := inp.y2_row
      dx1_row := dx1_row, dx2_row := dx2_row
      dim := dim
@@ -1846,9 +1846,9 @@ structure RegistryInvariant (reg : Registry CoreType) : Prop where
   hDestroyedHaveOps : ∀ e, e ∈ reg.entries → e.destroyed → e.active_ops > 0
 
 theorem emptyRegistry_invariant : RegistryInvariant (emptyRegistry : Registry CoreType) :=
-  { hIdsNonzero := fun _ h => absurd h (List.not_mem_nil _),
-    hIdsUnique := fun _ _ h1 => absurd h1 (List.not_mem_nil _),
-    hDestroyedHaveOps := fun _ h => absurd h (List.not_mem_nil _) }
+  { hIdsNonzero := fun _ h => absurd h (List.not_mem_nil),
+    hIdsUnique := fun _ _ h1 => absurd h1 (List.not_mem_nil),
+    hDestroyedHaveOps := fun _ h => absurd h (List.not_mem_nil) }
 
 def registerCore (reg : Registry CoreType) (core : CoreType) :
     Registry CoreType × Nat :=
@@ -1863,7 +1863,7 @@ theorem registerCore_returns_nextId (reg : Registry CoreType) (core : CoreType) 
 
 theorem registerCore_entry_count (reg : Registry CoreType) (core : CoreType) :
     (registerCore reg core).1.entries.length = reg.entries.length + 1 :=
-  List.length_append reg.entries [_]
+  List.length_append
 
 theorem registerCore_new_entry_not_destroyed (reg : Registry CoreType) (core : CoreType) :
     let newEntry := { id := reg.nextId, core := core, active_ops := 0, destroyed := false :
@@ -2267,7 +2267,7 @@ theorem snapshotModel_cfg (ni : NumericInterface) (core : RSFCore ni) :
 open NumericSem TensorMem LayerCoreDef RSFCoreDef in
 theorem snapshotModel_layers_length (ni : NumericInterface) (core : RSFCore ni) :
     (snapshotModel ni core).layers.length = core.layers.length :=
-  List.length_map core.layers _
+  List.length_map _
 
 end SnapshotModel
 
@@ -2803,7 +2803,7 @@ theorem emptyRegistry_count : registryCount (emptyRegistry : Registry CoreType) 
 open RegistryModel in
 theorem registerCore_increases_count (reg : Registry CoreType) (core : CoreType) :
     registryCount (registerCore reg core).1 = registryCount reg + 1 :=
-  List.length_append reg.entries [_]
+  List.length_append
 
 open RegistryModel in
 def countActive (reg : Registry CoreType) : Nat :=
@@ -2836,10 +2836,10 @@ structure RegistryWellFormed (reg : Registry CoreType) : Prop where
 
 open RegistryModel in
 theorem emptyRegistry_wellFormed : RegistryWellFormed (emptyRegistry : Registry CoreType) :=
-  { hIdNonzero := fun _ h => absurd h (List.not_mem_nil _),
-    hIdsUnique := fun _ _ h1 => absurd h1 (List.not_mem_nil _),
-    hNextIdFresh := fun _ h => absurd h (List.not_mem_nil _),
-    hDestroyedHaveOps := fun _ h => absurd h (List.not_mem_nil _) }
+  { hIdNonzero := fun _ h => absurd h (List.not_mem_nil),
+    hIdsUnique := fun _ _ h1 => absurd h1 (List.not_mem_nil),
+    hNextIdFresh := fun _ h => absurd h (List.not_mem_nil),
+    hDestroyedHaveOps := fun _ h => absurd h (List.not_mem_nil) }
 
 open RegistryModel in
 def idInDestroyLog (reg : Registry CoreType) (id : Nat) : Bool :=
@@ -3493,7 +3493,7 @@ def mergeRow (ni : NumericInterface) (x1 x2 : List ni.Val) : List ni.Val :=
 open NumericSem in
 theorem mergeRow_length (ni : NumericInterface) (x1 x2 : List ni.Val) :
     (mergeRow ni x1 x2).length = x1.length + x2.length :=
-  List.length_append x1 x2
+  List.length_append
 
 open NumericSem in
 theorem split_merge_roundtrip (ni : NumericInterface) (row : List ni.Val) (dim : Nat)
@@ -3623,7 +3623,7 @@ open CRCModel in
 theorem crcUpdateBytesWithTable_append (s : UInt32) (bs1 bs2 : List UInt8) :
     crcUpdateBytesWithTable s (bs1 ++ bs2) =
     crcUpdateBytesWithTable (crcUpdateBytesWithTable s bs1) bs2 :=
-  List.foldl_append crcUpdateByteWithTable s bs1 bs2
+  List.foldl_append
 
 open CRCModel in
 def crcFinalizeWithTable (state : UInt32) : UInt32 :=
@@ -4304,8 +4304,8 @@ structure SystemInvariant (ni : NumericInterface) (state : FullSystemState ni) :
 open NumericSem RSFCoreDef RegistryModel RSFPublicLifecycle in
 theorem systemInit_invariant (ni : NumericInterface) (cmi cma : ni.Val) (ge : Bool) :
     SystemInvariant ni (systemInit ni cmi cma ge) :=
-  { hAllHandlesValid := fun _ h => absurd h (List.not_mem_nil _),
-    hAllHandlesRegistered := fun _ h => absurd h (List.not_mem_nil _),
+  { hAllHandlesValid := fun _ h => absurd h (List.not_mem_nil),
+    hAllHandlesRegistered := fun _ h => absurd h (List.not_mem_nil),
     hAllocCounterPos := Nat.zero_lt_succ 0 }
 
 end MoreEndToEnd
@@ -5021,7 +5021,7 @@ open NumericSem RSFCoreDef SnapshotModel SerializerModel ByteSupport in
 
 open NumericSem SnapshotModel SerializerModel in
 theorem serializationValidation_holds (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 end SerializationExpansion
 
@@ -5067,7 +5067,7 @@ def gpuInvalidateOnWeightUpdate (ni : NumericInterface) (gs : GPUFullState ni) :
 
 open NumericSem RSFCoreDef GPUModel in
 theorem gpuInvalidateOnWeightUpdate_breaks_sync (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem RSFCoreDef GPUModel in
 def gpuResync (ni : NumericInterface) (gs : GPUFullState ni) : GPUFullState ni :=
@@ -5246,7 +5246,7 @@ theorem filter_all_true (n : Nat) : n = n := rfl
 theorem filter_none_true (n : Nat) : n = n := rfl
 
 theorem length_replicate (n : Nat) (v : α) : (List.replicate n v).length = n :=
-  List.length_replicate n v
+  List.length_replicate
 
 theorem getD_replicate (n : Nat) (v : α) : n = n := rfl
 
@@ -5258,17 +5258,17 @@ theorem foldl_singleton (f : β → α → β) (init : β) (x : α) :
 
 theorem range_succ (n : Nat) :
     List.range (n + 1) = List.range n ++ [n] :=
-  List.range_succ n
+  List.range_succ
 
 theorem take_nil (n : Nat) : n = n := rfl
 
 theorem drop_nil (n : Nat) : n = n := rfl
 
 theorem take_zero (l : List α) : l.take 0 = [] :=
-  List.take_zero l
+  List.take_zero
 
 theorem drop_zero (l : List α) : l.drop 0 = l :=
-  List.drop_zero l
+  List.drop_zero
 
 end ListLemmas
 
@@ -5352,7 +5352,7 @@ def validateAllInputs (ni : NumericInterface) (dim numLayers : Nat) (cfg : RSFCo
 
 open NumericSem RSFCoreDef DetailedValidation in
 theorem validateAllInputs_zero_dim (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 end ValidationLemmas
 
@@ -5475,7 +5475,7 @@ theorem registrySize_empty : registrySize (emptyRegistry : Registry CoreType) = 
 open RegistryModel in
 theorem registrySize_register (reg : Registry CoreType) (core : CoreType) :
     registrySize (registerCore reg core).1 = registrySize reg + 1 :=
-  List.length_append reg.entries [_]
+  List.length_append
 
 end RegistryLemmas
 
@@ -6343,7 +6343,7 @@ def initBiasVector (ni : NumericInterface) (dim : Nat) : List ni.Val :=
 open NumericSem in
 theorem initBiasVector_length (ni : NumericInterface) (dim : Nat) :
     (initBiasVector ni dim).length = dim :=
-  List.length_replicate dim ni.zero
+  List.length_replicate
 
 open NumericSem in
 theorem initBiasVector_all_zero (n : Nat) :
@@ -6518,11 +6518,11 @@ def validateConfig (ni : NumericInterface) (cfg : RSFConfig ni) : RSFResult Unit
 
 open NumericSem RSFCoreDef in
 theorem validateConfig_valid (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem RSFCoreDef in
 theorem validateConfig_zero_dim (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem RSFCoreDef in
 theorem defaultConfig (n : Nat) : n = n := rfl
@@ -7103,8 +7103,8 @@ open HandleOwnership RegistryModel in
 def emptyHandlePool (reg : Registry CoreType) : HandlePoolState CoreType :=
   { registry := reg,
     handleIds := [],
-    hAllPositive := fun _ h => absurd h (List.not_mem_nil _),
-    hAllRegistered := fun _ h => absurd h (List.not_mem_nil _) }
+    hAllPositive := fun _ h => absurd h (List.not_mem_nil),
+    hAllRegistered := fun _ h => absurd h (List.not_mem_nil) }
 
 open HandleOwnership RegistryModel in
 theorem emptyHandlePool_no_handles (reg : Registry CoreType) :
@@ -7203,7 +7203,7 @@ def mapAllLayerWeights (ni : NumericInterface) (layers : List (LayerCore ni)) (f
 
 open NumericSem LayerCoreDef in
 theorem mapAllLayerWeights_length {α β : Type} (f : α → β) (l : List α) :
-    (l.map f).length = l.length := List.length_map l f
+    (l.map f).length = l.length := List.length_map _
 
 open NumericSem LayerCoreDef in
 theorem mapAllLayerWeights_empty {α : Type} : ([] : List α) = [] := rfl
@@ -8637,15 +8637,15 @@ def validateTensorShape (shape : TensorShape) : RSFResult Unit :=
 
 open NumericSem TensorMem in
 theorem validateTensorShape_zero_rows (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem TensorMem in
 theorem validateTensorShape_zero_cols (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem TensorMem in
 theorem validateTensorShape_valid (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem TensorMem in
 def validateTensorDataLen (ni : NumericInterface) (t : TensorSlice ni)
@@ -8875,7 +8875,7 @@ theorem sequenceResults_single_ok (a : α) :
 
 open NumericSem in
 theorem sequenceResults_single_err : RSFResult.err RSFError.InvalidConfig ≠ RSFResult.ok () :=
-    fun h => RSFResult.noConfusion h
+    nofun
 
 end ErrorHandling
 
@@ -8908,7 +8908,7 @@ def mergeOutput2 (ni : NumericInterface) (y1 y2 : List ni.Val) : List ni.Val :=
 open NumericSem in
 theorem mergeOutput2_length (ni : NumericInterface) (y1 y2 : List ni.Val) :
     (mergeOutput2 ni y1 y2).length = y1.length + y2.length :=
-  List.length_append y1 y2
+  List.length_append
 
 open NumericSem RSFCoreDef in
 theorem splitMerge_roundtrip {α : Type} (x : α) (f g : α → α)
@@ -9266,7 +9266,7 @@ theorem accumGradRow_preserves_lc (ni : NumericInterface)
 
 open NumericSem LayerCoreDef TensorMem FullGradientWeightUpdate in
 theorem finalizeGradAccumulation {α : Type} (a b : List α) :
-    (a ++ b).length = a.length + b.length := List.length_append a b
+    (a ++ b).length = a.length + b.length := List.length_append
 
 open NumericSem LayerCoreDef FullGradientWeightUpdate in
 theorem finalizeGradAccumulation_preserves_dim (ni : NumericInterface) (dim : Nat) : dim = dim := rfl
@@ -10048,10 +10048,10 @@ open RegistryModel in
 theorem emptyRegistry_full_invariant :
     RegistryFullInvariant (emptyRegistry : Registry CoreType) :=
   { hNextGt := Nat.zero_lt_succ 0,
-    hAllIdsLt := fun _ h => absurd h (List.not_mem_nil _),
-    hAllIdsPos := fun _ h => absurd h (List.not_mem_nil _),
-    hNoNegOps := fun _ h => absurd h (List.not_mem_nil _),
-    hDestroyedCantAcquire := fun _ h => absurd h (List.not_mem_nil _) }
+    hAllIdsLt := fun _ h => absurd h (List.not_mem_nil),
+    hAllIdsPos := fun _ h => absurd h (List.not_mem_nil),
+    hNoNegOps := fun _ h => absurd h (List.not_mem_nil),
+    hDestroyedCantAcquire := fun _ h => absurd h (List.not_mem_nil) }
 
 end DetailedRegistryOps
 
@@ -10068,7 +10068,7 @@ theorem createHandle_zero_invalid (n : Nat) : n = n := rfl
 
 open NumericSem RSFCoreDef RegistryModel HandleOwnership in
 theorem createHandle_pos_valid (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem RSFCoreDef RegistryModel HandleOwnership in
 theorem incrementOps (n : Nat) : n = n := rfl
@@ -10270,7 +10270,7 @@ theorem matTransposeCol_length {α : Type} (l : List α) :
 open NumericSem in
 def fullTranspose (ni : NumericInterface) (mat : List ni.Val)
     (rows cols : Nat) : List ni.Val :=
-  List.range cols |>.bind fun c =>
+  List.range cols |>.flatMap fun c =>
     matTransposeCol ni mat rows cols c
 
 open NumericSem in
@@ -10748,7 +10748,7 @@ def isFullyValid (ni : NumericInterface) (pv : ParseVerification ni) : Bool :=
 
 open NumericSem ParserModel in
 theorem isFullyValid_all_true (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 end FullParseVerification
 
@@ -11419,7 +11419,7 @@ def mergeOutputs (ni : NumericInterface) (y1 y2 : List ni.Val) : List ni.Val :=
 open NumericSem in
 theorem mergeOutputs_length (ni : NumericInterface) (y1 y2 : List ni.Val) :
     (mergeOutputs ni y1 y2).length = y1.length + y2.length :=
-  List.length_append y1 y2
+  List.length_append
 
 open NumericSem in
 theorem mergeOutputs_same_dim (ni : NumericInterface) (dim : Nat) : dim = dim := rfl
@@ -11660,11 +11660,11 @@ def validatedBackward (ni : NumericInterface) (core : RSFCore ni) (x1_rows x2_ro
 
 open NumericSem RSFCoreDef in
 theorem validatedBackward_zero_batch (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem RSFCoreDef in
 theorem validatedBackward_shape_mismatch (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 end ValidatedBackward
 
@@ -11731,19 +11731,19 @@ theorem serializeSnapshot_deterministic (f : List UInt8 → UInt32) (x : List UI
 open NumericSem RSFCoreDef SnapshotModel SerializerModel ByteSupport
   DetailedParser2 DetailedCRC CRCExtended SnapshotCreationDetailed in
 theorem deserializeAndValidate (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem SnapshotModel in
 theorem deserializeAndValidate_too_short (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem SnapshotModel in
 theorem deserializeAndValidate_bad_magic (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem SnapshotModel in
 theorem deserializeAndValidate_bad_version (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 end DetailedSnapshotSerialization
 
@@ -12012,7 +12012,7 @@ theorem cloneLayer_new_storage (ni : NumericInterface) (lc : LayerCore ni) (sid 
 open NumericSem LayerCoreDef TensorMem in
 def cloneAllLayers (ni : NumericInterface) (layers : List (LayerCore ni)) :
     List (LayerCore ni) :=
-  layers.enum.map fun (idx, lc) => cloneLayer ni lc (idx * 10000)
+  layers.zipIdx.map fun (lc, idx) => cloneLayer ni lc (idx * 10000)
 
 open NumericSem LayerCoreDef in
 theorem cloneAllLayers_length {α : Type} (l : List α) :
@@ -12344,7 +12344,7 @@ def inferenceRoundtrip (ni : NumericInterface) (core : RSFCore ni) (x : List ni.
 
 open NumericSem RSFCoreDef FullPipelineOps in
 theorem inferenceRoundtrip_error_propagates : RSFResult.err RSFError.InvalidConfig ≠ RSFResult.ok () :=
-    fun h => RSFResult.noConfusion h
+    nofun
 
 end InferenceOps
 
@@ -13260,7 +13260,7 @@ def layersHaveNoAlias (ni : NumericInterface) (layers : List (LayerCore ni)) : P
 open NumericSem LayerCoreDef in
 theorem layersHaveNoAlias_empty (ni : NumericInterface) :
     layersHaveNoAlias ni ([] : List (LayerCore ni)) :=
-  fun _ h => absurd h (List.not_mem_nil _)
+  fun _ h => absurd h (List.not_mem_nil)
 
 open NumericSem LayerCoreDef in
 def crossLayerNoAlias (ni : NumericInterface) (l1 l2 : LayerCore ni) : Prop :=
@@ -13712,7 +13712,7 @@ open NumericSem RSFCoreDef LayerCoreDef RegistryModel HandleOwnership
 
 open NumericSem RSFCoreDef RSFCoreCreation in
 theorem cfv_create_valid (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem RSFCoreDef RSFCoreCreation in
 theorem cfv_create_layers (n : Nat) : n = n := rfl
@@ -13869,13 +13869,13 @@ structure MemorySafetyInvariant (ni : NumericInterface) (layers : List (LayerCor
 open NumericSem LayerCoreDef StorageAliasingComplete in
 theorem memorySafetyInvariant_empty (ni : NumericInterface) :
     MemorySafetyInvariant ni ([] : List (LayerCore ni)) :=
-  { hNoInternalAlias := fun _ h => absurd h (List.not_mem_nil _),
-    hAllStorageValid := fun _ h => absurd h (List.not_mem_nil _),
-    hGradStorageSafe := fun _ h => absurd h (List.not_mem_nil _) }
+  { hNoInternalAlias := fun _ h => absurd h (List.not_mem_nil),
+    hAllStorageValid := fun _ h => absurd h (List.not_mem_nil),
+    hGradStorageSafe := fun _ h => absurd h (List.not_mem_nil) }
 
 open NumericSem LayerCoreDef TensorMem in
 theorem tensorDataValid (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 open NumericSem LayerCoreDef in
 def layerDataValid (ni : NumericInterface) (lc : LayerCore ni) : Prop :=
@@ -13886,7 +13886,7 @@ def layerDataValid (ni : NumericInterface) (lc : LayerCore ni) : Prop :=
 
 open NumericSem LayerCoreDef RSFCoreCreation in
 theorem createDefaultLayerCore_data_valid (n : Nat) (h : n > 0) : n ≠ 0 :=
-    Nat.not_eq_zero_of_lt (Nat.zero_lt_of_lt h)
+    Nat.pos_iff_ne_zero.mp (Nat.zero_lt_of_lt h)
 
 end MemorySafetyModel
 
@@ -13965,7 +13965,7 @@ open NumericSem RSFCoreDef TrainingLoopSemantics in
 theorem completion_training (ni : NumericInterface) (lr : ni.Val) : lr = lr := rfl
 
 theorem completion_errors : RSFResult.err RSFError.InvalidConfig ≠ RSFResult.ok () :=
-    fun h => RSFResult.noConfusion h
+    nofun
 
 end CompletionTheorem
 
@@ -14539,7 +14539,7 @@ theorem accumulateTBiasGrad_deterministic (ni : NumericInterface) (f : ni.Val �
 
 open NumericSem LayerCoreDef BackwardGradientDecomposition in
 theorem applyAccumulatedGrads {α : Type} (a b : List α) :
-    (a ++ b).length = a.length + b.length := List.length_append a b
+    (a ++ b).length = a.length + b.length := List.length_append
 
 open NumericSem LayerCoreDef in
 theorem applyAccumulatedGrads_preserves_dim (ni : NumericInterface) (v : ni.Val) : v = v := rfl
@@ -14565,11 +14565,11 @@ open NumericSem RSFCoreDef LayerCoreDef RegistryModel GPUModel FullPipelineOps
 
 open NumericSem RSFCoreDef FinalAbstraction in
 theorem e2eConsistency_forward_error : RSFResult.err RSFError.InvalidConfig ≠ RSFResult.ok () :=
-    fun h => RSFResult.noConfusion h
+    nofun
 
 open NumericSem RSFCoreDef FinalAbstraction in
 theorem e2eConsistency_inverse_error : RSFResult.err RSFError.InvalidConfig ≠ RSFResult.ok () :=
-    fun h => RSFResult.noConfusion h
+    nofun
 
 open NumericSem RSFCoreDef FinalAbstraction in
 theorem e2eConsistency_save_magic (ni : NumericInterface) (v : ni.Val) : v = v := rfl
@@ -14671,7 +14671,7 @@ theorem fullLifecycle_save_magic (state : Nat) : state = state := rfl
 
 open NumericSem RSFCoreDef FinalAbstraction FullPipelineOps in
 theorem fullLifecycle_forward_error_on_bad_shape : RSFResult.err RSFError.InvalidConfig ≠ RSFResult.ok () :=
-    fun h => RSFResult.noConfusion h
+    nofun
 
 end FullLifecycleDemo
 
@@ -14945,7 +14945,7 @@ theorem finalAssertion_crc (crc : UInt32) : crc = crc := rfl
 
 open NumericSem RSFCoreDef FinalAbstraction FullPipelineOps in
 theorem finalAssertion_forward_inverse_errors : RSFResult.err RSFError.InvalidConfig ≠ RSFResult.ok () :=
-    fun h => RSFResult.noConfusion h
+    nofun
 
 open NumericSem RSFCoreDef FullPayloadSerialization FullPayloadDeserialization
   FinalAbstraction in
@@ -15071,7 +15071,7 @@ theorem closingTheorem_registry (ni : NumericInterface)
 
 open NumericSem RSFCoreDef FinalAbstraction FullPipelineOps in
 theorem closingTheorem_error_handling : RSFResult.err RSFError.InvalidConfig ≠ RSFResult.ok () :=
-    fun h => RSFResult.noConfusion h
+    nofun
 
 end ClosingTheorems
 
@@ -15517,7 +15517,7 @@ theorem vectorScale_nil (ni : NumericInterface) (s : ni.Val) :
 
 open NumericSem in
 theorem vectorScale_length (ni : NumericInterface) (s : ni.Val) (v : List ni.Val) :
-    (vectorScale ni s v).length = v.length := List.length_map v (ni.mul s)
+    (vectorScale ni s v).length = v.length := List.length_map _
 
 open NumericSem in
 def vectorNegate (ni : NumericInterface) (v : List ni.Val) : List ni.Val :=
@@ -15557,7 +15557,7 @@ theorem vectorClip_nil (ni : NumericInterface) (lo hi : ni.Val) :
 
 open NumericSem in
 theorem vectorClip_length (ni : NumericInterface) (v : List ni.Val) (lo hi : ni.Val) :
-    (vectorClip ni v lo hi).length = v.length := List.length_map v _
+    (vectorClip ni v lo hi).length = v.length := List.length_map _
 
 open NumericSem in
 def vectorApply (ni : NumericInterface) (f : ni.Val → ni.Val) (v : List ni.Val) : List ni.Val :=
@@ -15569,7 +15569,7 @@ theorem vectorApply_nil (ni : NumericInterface) (f : ni.Val → ni.Val) :
 
 open NumericSem in
 theorem vectorApply_length (ni : NumericInterface) (f : ni.Val → ni.Val) (v : List ni.Val) :
-    (vectorApply ni f v).length = v.length := List.length_map v f
+    (vectorApply ni f v).length = v.length := List.length_map _
 
 open NumericSem in
 def outerProduct (ni : NumericInterface) (a b : List ni.Val) : List ni.Val :=
@@ -15590,7 +15590,7 @@ open NumericSem in
 theorem matVecMul_length (ni : NumericInterface) (matrix vec : List ni.Val)
     (rows cols : Nat) :
     (matVecMul ni matrix vec rows cols).length = (List.range rows).length :=
-  List.length_map (List.range rows) _
+  List.length_map _
 
 open NumericSem in
 def transposeFlat (ni : NumericInterface) (m : List ni.Val) (rows cols : Nat) : List ni.Val :=
@@ -15631,7 +15631,7 @@ open NumericSem in
 theorem linearCombinationBatch_length (ni : NumericInterface) (wm : List ni.Val)
     (batch : List (List ni.Val)) (biases : List ni.Val) (od inputDim : Nat) :
     (linearCombinationBatch ni wm batch biases od inputDim).length = batch.length :=
-  List.length_map batch _
+  List.length_map _
 
 end NumericVectorExtended
 
@@ -15659,7 +15659,7 @@ open NumericSem ShapeDef LayerCoreDef in
 theorem computeScaleVec_length (ni : NumericInterface) (lc : LayerCore ni)
     (inputRow : List ni.Val) :
     (computeScaleVec ni lc inputRow).length = (List.range lc.dim).length :=
-  List.length_map (List.range lc.dim) _
+  List.length_map _
 
 open NumericSem ShapeDef LayerCoreDef in
 def computeTransVec (ni : NumericInterface) (lc : LayerCore ni)
@@ -15673,7 +15673,7 @@ open NumericSem ShapeDef LayerCoreDef in
 theorem computeTransVec_length (ni : NumericInterface) (lc : LayerCore ni)
     (inputRow : List ni.Val) :
     (computeTransVec ni lc inputRow).length = (List.range lc.dim).length :=
-  List.length_map (List.range lc.dim) _
+  List.length_map _
 
 open NumericSem ShapeDef LayerCoreDef in
 def forwardRow (ni : NumericInterface) (lc : LayerCore ni)
@@ -15707,7 +15707,7 @@ theorem forwardBatch_nil (ni : NumericInterface) (lc : LayerCore ni) :
 open NumericSem ShapeDef LayerCoreDef in
 theorem forwardBatch_length (ni : NumericInterface) (lc : LayerCore ni)
     (pairs : List (List ni.Val × List ni.Val)) :
-    (forwardBatch ni lc pairs).length = pairs.length := List.length_map pairs _
+    (forwardBatch ni lc pairs).length = pairs.length := List.length_map _
 
 open NumericSem ShapeDef LayerCoreDef in
 def inverseBatch (ni : NumericInterface) (lc : LayerCore ni)
@@ -15721,7 +15721,7 @@ theorem inverseBatch_nil (ni : NumericInterface) (lc : LayerCore ni) :
 open NumericSem ShapeDef LayerCoreDef in
 theorem inverseBatch_length (ni : NumericInterface) (lc : LayerCore ni)
     (pairs : List (List ni.Val × List ni.Val)) :
-    (inverseBatch ni lc pairs).length = pairs.length := List.length_map pairs _
+    (inverseBatch ni lc pairs).length = pairs.length := List.length_map _
 
 open NumericSem ShapeDef LayerCoreDef in
 def forwardThroughStack (ni : NumericInterface) (layers : List (LayerCore ni))
@@ -15936,7 +15936,7 @@ theorem versionBytes_length : versionBytes.length = 4 := rfl
 
 def headerBytes : List UInt8 := magicBytes ++ versionBytes
 theorem headerBytes_length : headerBytes.length = 8 :=
-  List.length_append magicBytes versionBytes
+  List.length_append
 
 def encodeU32 (v : UInt32) : List UInt8 :=
   [ (v &&& 0xFF).toUInt8
@@ -15948,7 +15948,7 @@ theorem encodeU32_length (v : UInt32) : (encodeU32 v).length = 4 := rfl
 def encodeU64 (v : UInt64) : List UInt8 :=
   encodeU32 v.toUInt32 ++ encodeU32 (v >>> 32).toUInt32
 theorem encodeU64_length (v : UInt64) : (encodeU64 v).length = 8 :=
-  List.length_append (encodeU32 v.toUInt32) _
+  List.length_append
 
 def decodeU32 (bytes : List UInt8) : Option UInt32 :=
   if bytes.length < 4 then none
@@ -16166,7 +16166,7 @@ theorem regSize_empty {α : Type} : @regSize α emptyReg = 0 := rfl
 
 theorem regSize_after_register {α : Type} (reg : Reg α) (v : α) :
     (registerVal reg v).1.entries.length = reg.entries.length + 1 :=
-  List.length_append reg.entries _
+  List.length_append
 
 def containsId {α : Type} (reg : Reg α) (id : Nat) : Bool :=
   reg.entries.any (fun e => e.entryId == id)
@@ -16452,7 +16452,7 @@ def snapshotAllLayers (ni : NumericInterface) (layers : List (LayerCore ni)) :
 
 open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
 theorem snapshotAllLayers_length (ni : NumericInterface) (layers : List (LayerCore ni)) :
-    (snapshotAllLayers ni layers).length = layers.length := List.length_map layers _
+    (snapshotAllLayers ni layers).length = layers.length := List.length_map _
 
 open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
 theorem snapshotAllLayers_nil (ni : NumericInterface) :
@@ -16644,7 +16644,7 @@ open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
 theorem acceptance_snap_layers (ni : NumericInterface) (core : RSFCore ni) :
     (SnapshotModelExtended.snapshotModel ni core).layers.length = core.layers.length :=
   show (core.layers.map _).length = core.layers.length from
-    List.length_map core.layers _
+    List.length_map _
 
 -- Gradient update preserves dim
 open NumericSem ShapeDef LayerCoreDef in
@@ -16833,7 +16833,7 @@ def resizeRegion (pool : StoragePool) (id : Nat) (newSize : Nat) : StoragePool :
 
 theorem resizeRegion_preserves_count (pool : StoragePool) (id : Nat) (ns : Nat) :
     (resizeRegion pool id ns).regions.length = pool.regions.length :=
-  List.length_map pool.regions _
+  List.length_map _
 
 end StorageAliasingModel
 
@@ -16893,9 +16893,9 @@ theorem interleaveVectors_nil (ni : NumericInterface) :
 open NumericSem in
 def deinterleaveVectors (ni : NumericInterface) (data : List ni.Val) :
     List ni.Val × List ni.Val :=
-  let indexed := data.enum
-  let evens := (indexed.filter (fun (i, _) => i % 2 == 0)).map Prod.snd
-  let odds := (indexed.filter (fun (i, _) => i % 2 == 1)).map Prod.snd
+  let indexed := data.zipIdx
+  let evens := (indexed.filter (fun (_, i) => i % 2 == 0)).map Prod.fst
+  let odds := (indexed.filter (fun (_, i) => i % 2 == 1)).map Prod.fst
   (evens, odds)
 
 open NumericSem in
@@ -16925,13 +16925,13 @@ open NumericSem ShapeDef LayerCoreDef in
 theorem forwardRow_preserves_pair_count (ni : NumericInterface) (lc : LayerCore ni)
     (pairs : List (List ni.Val × List ni.Val)) :
     (ForwardInverseDetailed.forwardBatch ni lc pairs).length = pairs.length :=
-  List.length_map pairs _
+  List.length_map _
 
 open NumericSem ShapeDef LayerCoreDef in
 theorem inverseRow_preserves_pair_count (ni : NumericInterface) (lc : LayerCore ni)
     (pairs : List (List ni.Val × List ni.Val)) :
     (ForwardInverseDetailed.inverseBatch ni lc pairs).length = pairs.length :=
-  List.length_map pairs _
+  List.length_map _
 
 -- Forward through empty layers doesn't change input
 open NumericSem ShapeDef LayerCoreDef in
@@ -17248,7 +17248,7 @@ theorem contains_empty {α : Type} (id : Nat) :
 -- Resize preserves region count
 theorem resize_preserves_count (pool : StorageAliasingModel.StoragePool) (id ns : Nat) :
     (StorageAliasingModel.resizeRegion pool id ns).regions.length = pool.regions.length :=
-  List.length_map pool.regions _
+  List.length_map _
 
 -- Allocation from empty pool
 theorem alloc_from_empty (size : Nat) :
@@ -17268,7 +17268,7 @@ end RegistrySafetyTheorems
 namespace ByteEncodingUtils
 
 def bytesToNat (bytes : List UInt8) : Nat :=
-  bytes.enum.foldl (fun acc (i, b) => acc + b.toNat * (256 ^ i)) 0
+  bytes.zipIdx.foldl (fun acc (b, i) => acc + b.toNat * (256 ^ i)) 0
 theorem bytesToNat_nil : bytesToNat [] = 0 := rfl
 
 def natToBytes (n : Nat) (count : Nat) : List UInt8 :=
@@ -17321,14 +17321,14 @@ theorem rotateBytes_det (data : List UInt8) (n : Nat) :
 def reverseBytes (data : List UInt8) : List UInt8 := data.reverse
 theorem reverseBytes_nil : reverseBytes [] = [] := rfl
 theorem reverseBytes_length (data : List UInt8) :
-    (reverseBytes data).length = data.length := List.length_reverse data
+    (reverseBytes data).length = data.length := List.length_reverse
 
 def concatBytes (a b : List UInt8) : List UInt8 := a ++ b
 theorem concatBytes_nil_left (b : List UInt8) : concatBytes [] b = b := rfl
 theorem concatBytes_nil_right (a : List UInt8) : concatBytes a [] = a :=
   List.append_nil a
 theorem concatBytes_length (a b : List UInt8) :
-    (concatBytes a b).length = a.length + b.length := List.length_append a b
+    (concatBytes a b).length = a.length + b.length := List.length_append
 
 end ByteEncodingUtils
 
@@ -17344,21 +17344,21 @@ def zerosInit (ni : NumericInterface) (n : Nat) : List ni.Val :=
   List.replicate n ni.zero
 open NumericSem in
 theorem zerosInit_length (ni : NumericInterface) (n : Nat) :
-    (zerosInit ni n).length = n := List.length_replicate n ni.zero
+    (zerosInit ni n).length = n := List.length_replicate
 
 open NumericSem in
 def onesInit (ni : NumericInterface) (n : Nat) : List ni.Val :=
   List.replicate n ni.one
 open NumericSem in
 theorem onesInit_length (ni : NumericInterface) (n : Nat) :
-    (onesInit ni n).length = n := List.length_replicate n ni.one
+    (onesInit ni n).length = n := List.length_replicate
 
 open NumericSem in
 def constantInit (ni : NumericInterface) (n : Nat) (c : ni.Val) : List ni.Val :=
   List.replicate n c
 open NumericSem in
 theorem constantInit_length (ni : NumericInterface) (n : Nat) (c : ni.Val) :
-    (constantInit ni n c).length = n := List.length_replicate n c
+    (constantInit ni n c).length = n := List.length_replicate
 
 open NumericSem in
 def identityInit (ni : NumericInterface) (dim : Nat) : List ni.Val :=
@@ -17367,7 +17367,7 @@ def identityInit (ni : NumericInterface) (dim : Nat) : List ni.Val :=
 open NumericSem in
 theorem identityInit_length (ni : NumericInterface) (dim : Nat) :
     (identityInit ni dim).length = (List.range (dim * dim)).length :=
-  List.length_map (List.range (dim * dim)) _
+  List.length_map _
 
 open NumericSem in
 def scaleInit (ni : NumericInterface) (dim : Nat) (factor : ni.Val) : List ni.Val :=
@@ -17375,7 +17375,7 @@ def scaleInit (ni : NumericInterface) (dim : Nat) (factor : ni.Val) : List ni.Va
 open NumericSem in
 theorem scaleInit_length (ni : NumericInterface) (dim : Nat) (f : ni.Val) :
     (scaleInit ni dim f).length = (identityInit ni dim).length :=
-  List.length_map (identityInit ni dim) _
+  List.length_map _
 
 open NumericSem in
 def randLikeInit (ni : NumericInterface) (n : Nat) (seed : Nat) : List ni.Val :=
@@ -17395,7 +17395,7 @@ def diagInit (ni : NumericInterface) (diag : List ni.Val) : List ni.Val :=
 open NumericSem in
 theorem diagInit_length (ni : NumericInterface) (diag : List ni.Val) :
     (diagInit ni diag).length = (List.range (diag.length * diag.length)).length :=
-  List.length_map (List.range (diag.length * diag.length)) _
+  List.length_map _
 
 end WeightInitModel
 
@@ -17476,7 +17476,7 @@ theorem applyWeightDecay_nil (ni : NumericInterface) (d : ni.Val) :
 
 open NumericSem in
 theorem applyWeightDecay_length (ni : NumericInterface) (w : List ni.Val) (d : ni.Val) :
-    (applyWeightDecay ni w d).length = w.length := List.length_map w _
+    (applyWeightDecay ni w d).length = w.length := List.length_map _
 
 end OptimizerModel
 
@@ -17589,12 +17589,12 @@ theorem seq_nil {α : Type} : @ErrorHandling.rsfSequence α [] = RSFResult.ok []
 -- Zeros init length
 open NumericSem in
 theorem zeros_length (ni : NumericInterface) (n : Nat) :
-    (WeightInitModel.zerosInit ni n).length = n := List.length_replicate n ni.zero
+    (WeightInitModel.zerosInit ni n).length = n := List.length_replicate
 
 -- Ones init length
 open NumericSem in
 theorem ones_length (ni : NumericInterface) (n : Nat) :
-    (WeightInitModel.onesInit ni n).length = n := List.length_replicate n ni.one
+    (WeightInitModel.onesInit ni n).length = n := List.length_replicate
 
 -- SGD update with empty weights
 open NumericSem in
@@ -17604,7 +17604,7 @@ theorem sgd_det (ni : NumericInterface) (st : OptimizerModel.SGDState ni) (w g :
 -- Weight decay preserves length
 open NumericSem in
 theorem decay_length (ni : NumericInterface) (w : List ni.Val) (d : ni.Val) :
-    (OptimizerModel.applyWeightDecay ni w d).length = w.length := List.length_map w _
+    (OptimizerModel.applyWeightDecay ni w d).length = w.length := List.length_map _
 
 -- Split pairs with zero dim
 open NumericSem in
@@ -17713,11 +17713,11 @@ theorem scanl_nil {α β : Type} (f : β → α → β) (init : β) :
 
 -- Reverse bytes preserves length
 theorem reverse_len (data : List UInt8) :
-    (ByteEncodingUtils.reverseBytes data).length = data.length := List.length_reverse data
+    (ByteEncodingUtils.reverseBytes data).length = data.length := List.length_reverse
 
 -- Concat bytes length
 theorem concat_len (a b : List UInt8) :
-    (ByteEncodingUtils.concatBytes a b).length = a.length + b.length := List.length_append a b
+    (ByteEncodingUtils.concatBytes a b).length = a.length + b.length := List.length_append
 
 -- Encoding determinism
 theorem encode_u32_det (v : UInt32) :
@@ -17812,7 +17812,7 @@ def workerCount (ds : DistributedState) : Nat := ds.workers.length
 
 theorem workerCount_init (n : Nat) :
     workerCount (initDistributed n) = (List.range n).length :=
-  List.length_map (List.range n) _
+  List.length_map _
 
 def isDistributedComplete (ds : DistributedState) : Bool :=
   ds.completedBatches ≥ ds.totalBatches
@@ -18097,7 +18097,7 @@ def mapPipeline {α β : Type} (f : α → β) (inputs : List α) : List β := i
 theorem mapPipeline_nil {α β : Type} (f : α → β) :
     mapPipeline f ([] : List α) = [] := rfl
 theorem mapPipeline_length {α β : Type} (f : α → β) (inputs : List α) :
-    (mapPipeline f inputs).length = inputs.length := List.length_map inputs f
+    (mapPipeline f inputs).length = inputs.length := List.length_map _
 
 def filterPipeline {α : Type} (p : α → Bool) (inputs : List α) : List α := inputs.filter p
 theorem filterPipeline_nil {α : Type} (p : α → Bool) :
@@ -18203,7 +18203,7 @@ theorem normalizeVector_nil (ni : NumericInterface) :
 
 open NumericSem in
 theorem normalizeVector_length (ni : NumericInterface) (v : List ni.Val) :
-    (normalizeVector ni v).length = v.length := List.length_map v _
+    (normalizeVector ni v).length = v.length := List.length_map _
 
 open NumericSem in
 def standardizeVector (ni : NumericInterface) (v : List ni.Val) (mean std : ni.Val) :
@@ -18218,7 +18218,7 @@ theorem standardizeVector_nil (ni : NumericInterface) (m s : ni.Val) :
 open NumericSem in
 theorem standardizeVector_length (ni : NumericInterface) (v : List ni.Val)
     (m s : ni.Val) :
-    (standardizeVector ni v m s).length = v.length := List.length_map v _
+    (standardizeVector ni v m s).length = v.length := List.length_map _
 
 open NumericSem in
 def batchNormalize (ni : NumericInterface) (batch : List (List ni.Val)) :
@@ -18231,7 +18231,7 @@ theorem batchNormalize_nil (ni : NumericInterface) :
 
 open NumericSem in
 theorem batchNormalize_length (ni : NumericInterface) (batch : List (List ni.Val)) :
-    (batchNormalize ni batch).length = batch.length := List.length_map batch _
+    (batchNormalize ni batch).length = batch.length := List.length_map _
 
 open NumericSem in
 def applyTransform (ni : NumericInterface) (f : ni.Val → ni.Val) (batch : List (List ni.Val)) :
@@ -18245,20 +18245,20 @@ theorem applyTransform_nil (ni : NumericInterface) (f : ni.Val → ni.Val) :
 open NumericSem in
 theorem applyTransform_length (ni : NumericInterface) (f : ni.Val → ni.Val)
     (batch : List (List ni.Val)) :
-    (applyTransform ni f batch).length = batch.length := List.length_map batch _
+    (applyTransform ni f batch).length = batch.length := List.length_map _
 
 def shuffleIndices (n seed : Nat) : List Nat :=
   let indices := List.range n
   indices.reverse
 
 theorem shuffleIndices_length (n seed : Nat) :
-    (shuffleIndices n seed).length = (List.range n).length := List.length_reverse _
+    (shuffleIndices n seed).length = (List.range n).length := List.length_reverse
 
 def reorderByIndices {α : Type} (data : List α) (indices : List Nat) (default : α) : List α :=
   indices.map (fun i => data.getD i default)
 
 theorem reorderByIndices_length {α : Type} (data : List α) (indices : List Nat) (d : α) :
-    (reorderByIndices data indices d).length = indices.length := List.length_map indices _
+    (reorderByIndices data indices d).length = indices.length := List.length_map _
 
 end DataPreprocessing
 
@@ -18577,11 +18577,11 @@ theorem gate_val_nil (ni : NumericInterface) :
 -- Weight init length
 open NumericSem in
 theorem gate_zeros_len (ni : NumericInterface) (n : Nat) :
-    (WeightInitModel.zerosInit ni n).length = n := List.length_replicate n ni.zero
+    (WeightInitModel.zerosInit ni n).length = n := List.length_replicate
 
 -- Reverse preserves length
 theorem gate_reverse_len (d : List UInt8) :
-    (ByteEncodingUtils.reverseBytes d).length = d.length := List.length_reverse d
+    (ByteEncodingUtils.reverseBytes d).length = d.length := List.length_reverse
 
 -- Bool encode roundtrip
 theorem gate_bool_true :
@@ -18597,7 +18597,7 @@ theorem gate_reshape_det (a b : Shape) :
 -- Normalize preserves length
 open NumericSem in
 theorem gate_normalize_len (ni : NumericInterface) (v : List ni.Val) :
-    (DataPreprocessing.normalizeVector ni v).length = v.length := List.length_map v _
+    (DataPreprocessing.normalizeVector ni v).length = v.length := List.length_map _
 
 -- Model structure equal reflexive
 open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
@@ -18648,7 +18648,7 @@ theorem applyActivation_nil (ni : NumericInterface) (f : ni.Val → ni.Val) :
 
 open NumericSem in
 theorem applyActivation_length (ni : NumericInterface) (f : ni.Val → ni.Val) (v : List ni.Val) :
-    (applyActivation ni f v).length = v.length := List.length_map v f
+    (applyActivation ni f v).length = v.length := List.length_map _
 
 open NumericSem in
 def applyBatchActivation (ni : NumericInterface) (f : ni.Val → ni.Val)
@@ -18662,7 +18662,7 @@ theorem applyBatchActivation_nil (ni : NumericInterface) (f : ni.Val → ni.Val)
 open NumericSem in
 theorem applyBatchActivation_length (ni : NumericInterface) (f : ni.Val → ni.Val)
     (batch : List (List ni.Val)) :
-    (applyBatchActivation ni f batch).length = batch.length := List.length_map batch _
+    (applyBatchActivation ni f batch).length = batch.length := List.length_map _
 
 open NumericSem in
 def activationGradRelu (ni : NumericInterface) (x : ni.Val) : ni.Val :=
@@ -18680,7 +18680,7 @@ theorem activationGradBatch_nil (ni : NumericInterface) (gradF : ni.Val → ni.V
 open NumericSem in
 theorem activationGradBatch_length (ni : NumericInterface) (gradF : ni.Val → ni.Val)
     (inputs : List ni.Val) :
-    (activationGradBatch ni gradF inputs).length = inputs.length := List.length_map inputs gradF
+    (activationGradBatch ni gradF inputs).length = inputs.length := List.length_map _
 
 end ActivationModel
 
@@ -18778,7 +18778,7 @@ theorem quantizeVector_nil (ni : NumericInterface) (s : ni.Val) :
 
 open NumericSem in
 theorem quantizeVector_length (ni : NumericInterface) (v : List ni.Val) (s : ni.Val) :
-    (quantizeVector ni v s).length = v.length := List.length_map v _
+    (quantizeVector ni v s).length = v.length := List.length_map _
 
 open NumericSem in
 def dequantizeVector (ni : NumericInterface) (bits : List Nat) (scale : ni.Val) : List ni.Val :=
@@ -18790,7 +18790,7 @@ theorem dequantizeVector_nil (ni : NumericInterface) (s : ni.Val) :
 
 open NumericSem in
 theorem dequantizeVector_length (ni : NumericInterface) (bits : List Nat) (s : ni.Val) :
-    (dequantizeVector ni bits s).length = bits.length := List.length_map bits _
+    (dequantizeVector ni bits s).length = bits.length := List.length_map _
 
 def computeScale (minVal maxVal : Nat) (numBits : Nat) : Nat :=
   if numBits = 0 then 1
@@ -18850,7 +18850,7 @@ def batchMap {α β : Type} (f : α → β) (batches : List (List α)) : List (L
 
 theorem batchMap_nil {α β : Type} (f : α → β) : batchMap f ([] : List (List α)) = [] := rfl
 theorem batchMap_length {α β : Type} (f : α → β) (bs : List (List α)) :
-    (batchMap f bs).length = bs.length := List.length_map bs _
+    (batchMap f bs).length = bs.length := List.length_map _
 
 open NumericSem in
 def batchReduce {α : Type} (f : α → α → α) (init : α) (batches : List (List α)) : List α :=
@@ -18860,7 +18860,7 @@ theorem batchReduce_nil {α : Type} (f : α → α → α) (init : α) :
     batchReduce f init ([] : List (List α)) = [] := rfl
 theorem batchReduce_length {α : Type} (f : α → α → α) (init : α)
     (bs : List (List α)) :
-    (batchReduce f init bs).length = bs.length := List.length_map bs _
+    (batchReduce f init bs).length = bs.length := List.length_map _
 
 open NumericSem in
 def batchConcat {α : Type} (batches : List (List α)) : List α :=
@@ -18871,7 +18871,7 @@ open NumericSem in
 def batchReplicate {α : Type} (template : List α) (n : Nat) : List (List α) :=
   List.replicate n template
 theorem batchReplicate_length {α : Type} (t : List α) (n : Nat) :
-    (batchReplicate t n).length = n := List.length_replicate n t
+    (batchReplicate t n).length = n := List.length_replicate
 
 end BatchedOpsExtended
 
@@ -19000,8 +19000,8 @@ structure ModelMetadata where
   numLayers : Nat
   createdAt : Nat
 
-def isMetadataValid (meta : ModelMetadata) : Bool :=
-  meta.dimSize > 0 && meta.numLayers > 0 && isCompatible meta.version currentVersion
+def isMetadataValid (md : ModelMetadata) : Bool :=
+  md.dimSize > 0 && md.numLayers > 0 && isCompatible md.version currentVersion
 
 theorem isMetadataValid_det (m : ModelMetadata) :
     isMetadataValid m = isMetadataValid m := rfl
@@ -19027,23 +19027,23 @@ namespace FinalSystemAcceptance
 -- Activation preserves length
 open NumericSem in
 theorem act_len (ni : NumericInterface) (f : ni.Val → ni.Val) (v : List ni.Val) :
-    (ActivationModel.applyActivation ni f v).length = v.length := List.length_map v f
+    (ActivationModel.applyActivation ni f v).length = v.length := List.length_map _
 
 -- Batch activation preserves count
 open NumericSem in
 theorem batch_act_len (ni : NumericInterface) (f : ni.Val → ni.Val)
     (b : List (List ni.Val)) :
-    (ActivationModel.applyBatchActivation ni f b).length = b.length := List.length_map b _
+    (ActivationModel.applyBatchActivation ni f b).length = b.length := List.length_map _
 
 -- Quantization preserves length
 open NumericSem in
 theorem quant_len (ni : NumericInterface) (v : List ni.Val) (s : ni.Val) :
-    (QuantizationHelpers.quantizeVector ni v s).length = v.length := List.length_map v _
+    (QuantizationHelpers.quantizeVector ni v s).length = v.length := List.length_map _
 
 -- Dequantization preserves length
 open NumericSem in
 theorem dequant_len (ni : NumericInterface) (b : List Nat) (s : ni.Val) :
-    (QuantizationHelpers.dequantizeVector ni b s).length = b.length := List.length_map b _
+    (QuantizationHelpers.dequantizeVector ni b s).length = b.length := List.length_map _
 
 -- Batch forward nil layers
 open NumericSem ShapeDef LayerCoreDef in
@@ -19145,26 +19145,26 @@ theorem sys_bool_rt_false :
 -- Normalize length (system gate)
 open NumericSem in
 theorem sys_normalize_len (ni : NumericInterface) (v : List ni.Val) :
-    (DataPreprocessing.normalizeVector ni v).length = v.length := List.length_map v _
+    (DataPreprocessing.normalizeVector ni v).length = v.length := List.length_map _
 
 -- Batch replicate length
 theorem sys_replicate_len {α : Type} (t : List α) (n : Nat) :
-    (BatchedOpsExtended.batchReplicate t n).length = n := List.length_replicate n t
+    (BatchedOpsExtended.batchReplicate t n).length = n := List.length_replicate
 
 -- Weight init (system gate)
 open NumericSem in
 theorem sys_zeros_len (ni : NumericInterface) (n : Nat) :
-    (WeightInitModel.zerosInit ni n).length = n := List.length_replicate n ni.zero
+    (WeightInitModel.zerosInit ni n).length = n := List.length_replicate
 
 open NumericSem in
 theorem sys_ones_len (ni : NumericInterface) (n : Nat) :
-    (WeightInitModel.onesInit ni n).length = n := List.length_replicate n ni.one
+    (WeightInitModel.onesInit ni n).length = n := List.length_replicate
 
 -- Byte ops (system gate)
 theorem sys_reverse_len (d : List UInt8) :
-    (ByteEncodingUtils.reverseBytes d).length = d.length := List.length_reverse d
+    (ByteEncodingUtils.reverseBytes d).length = d.length := List.length_reverse
 theorem sys_concat_len (a b : List UInt8) :
-    (ByteEncodingUtils.concatBytes a b).length = a.length + b.length := List.length_append a b
+    (ByteEncodingUtils.concatBytes a b).length = a.length + b.length := List.length_append
 
 -- Version encoding
 theorem sys_ver_enc_len (v : VersionModel.Version) :
@@ -19350,7 +19350,7 @@ theorem clipGradients_nil (ni : NumericInterface) (m : ni.Val) :
 
 open NumericSem in
 theorem clipGradients_length (ni : NumericInterface) (g : List ni.Val) (m : ni.Val) :
-    (clipGradients ni g m).length = g.length := List.length_map g _
+    (clipGradients ni g m).length = g.length := List.length_map _
 
 open NumericSem in
 def scaleGradients (ni : NumericInterface) (grads : List ni.Val) (scale : ni.Val) :
@@ -19363,7 +19363,7 @@ theorem scaleGradients_nil (ni : NumericInterface) (s : ni.Val) :
 
 open NumericSem in
 theorem scaleGradients_length (ni : NumericInterface) (g : List ni.Val) (s : ni.Val) :
-    (scaleGradients ni g s).length = g.length := List.length_map g _
+    (scaleGradients ni g s).length = g.length := List.length_map _
 
 open NumericSem in
 def accumulateGradients (ni : NumericInterface) (accumulated fresh : List ni.Val) :
@@ -19389,7 +19389,7 @@ theorem averageGradients_length (ni : NumericInterface) (g : List ni.Val) (c : N
     (hc : c ≠ 0) :
     (averageGradients ni g c).length = g.length :=
   show (if c = 0 then g else g.map _).length = g.length from
-    if_neg hc ▸ List.length_map g _
+    if_neg hc ▸ List.length_map _
 
 open NumericSem in
 def isGradientFinite (ni : NumericInterface) (grads : List ni.Val) : Bool :=
@@ -19448,13 +19448,13 @@ theorem gate_clip_nil (ni : NumericInterface) (m : ni.Val) :
     GradientAnalysis.clipGradients ni [] m = [] := rfl
 open NumericSem in
 theorem gate_clip_len (ni : NumericInterface) (g : List ni.Val) (m : ni.Val) :
-    (GradientAnalysis.clipGradients ni g m).length = g.length := List.length_map g _
+    (GradientAnalysis.clipGradients ni g m).length = g.length := List.length_map _
 open NumericSem in
 theorem gate_scale_nil (ni : NumericInterface) (s : ni.Val) :
     GradientAnalysis.scaleGradients ni [] s = [] := rfl
 open NumericSem in
 theorem gate_scale_len (ni : NumericInterface) (g : List ni.Val) (s : ni.Val) :
-    (GradientAnalysis.scaleGradients ni g s).length = g.length := List.length_map g _
+    (GradientAnalysis.scaleGradients ni g s).length = g.length := List.length_map _
 open NumericSem in
 theorem gate_avg_zero (ni : NumericInterface) (g : List ni.Val) :
     GradientAnalysis.averageGradients ni g 0 = g := rfl
@@ -19471,7 +19471,7 @@ theorem gate_act_nil (ni : NumericInterface) (f : ni.Val → ni.Val) :
     ActivationModel.applyActivation ni f [] = [] := rfl
 open NumericSem in
 theorem gate_act_len (ni : NumericInterface) (f : ni.Val → ni.Val) (v : List ni.Val) :
-    (ActivationModel.applyActivation ni f v).length = v.length := List.length_map v f
+    (ActivationModel.applyActivation ni f v).length = v.length := List.length_map _
 
 -- Regularization
 open NumericSem in
@@ -19487,13 +19487,13 @@ theorem gate_quant_nil (ni : NumericInterface) (s : ni.Val) :
     QuantizationHelpers.quantizeVector ni [] s = [] := rfl
 open NumericSem in
 theorem gate_quant_len (ni : NumericInterface) (v : List ni.Val) (s : ni.Val) :
-    (QuantizationHelpers.quantizeVector ni v s).length = v.length := List.length_map v _
+    (QuantizationHelpers.quantizeVector ni v s).length = v.length := List.length_map _
 open NumericSem in
 theorem gate_dequant_nil (ni : NumericInterface) (s : ni.Val) :
     QuantizationHelpers.dequantizeVector ni [] s = [] := rfl
 open NumericSem in
 theorem gate_dequant_len (ni : NumericInterface) (b : List Nat) (s : ni.Val) :
-    (QuantizationHelpers.dequantizeVector ni b s).length = b.length := List.length_map b _
+    (QuantizationHelpers.dequantizeVector ni b s).length = b.length := List.length_map _
 
 -- Loss functions
 open NumericSem in
@@ -19524,7 +19524,7 @@ theorem gate_norm_nil (ni : NumericInterface) :
     DataPreprocessing.normalizeVector ni [] = [] := rfl
 open NumericSem in
 theorem gate_norm_len (ni : NumericInterface) (v : List ni.Val) :
-    (DataPreprocessing.normalizeVector ni v).length = v.length := List.length_map v _
+    (DataPreprocessing.normalizeVector ni v).length = v.length := List.length_map _
 open NumericSem in
 theorem gate_std_nil (ni : NumericInterface) (m s : ni.Val) :
     DataPreprocessing.standardizeVector ni [] m s = [] := rfl
@@ -19588,7 +19588,7 @@ theorem gate_alloc_id (s : Nat) :
 -- Batch operations
 theorem gate_batch_concat_nil {α : Type} : @BatchedOpsExtended.batchConcat α [] = [] := rfl
 theorem gate_batch_rep_len {α : Type} (t : List α) (n : Nat) :
-    (BatchedOpsExtended.batchReplicate t n).length = n := List.length_replicate n t
+    (BatchedOpsExtended.batchReplicate t n).length = n := List.length_replicate
 
 -- Index math
 theorem gate_flat_2d (c : Nat) : IndexMath.flatIndex2D 0 0 c = 0 :=
@@ -19691,7 +19691,7 @@ theorem outerProductFull_nil_a (ni : NumericInterface) (b : List ni.Val) :
 
 open NumericSem in
 theorem outerProductFull_length (ni : NumericInterface) (a b : List ni.Val) :
-    (outerProductFull ni a b).length = a.length := List.length_map a _
+    (outerProductFull ni a b).length = a.length := List.length_map _
 
 open NumericSem in
 def matMulFull (ni : NumericInterface) (rows cols : Nat) (a b : List ni.Val) :
@@ -19730,7 +19730,7 @@ theorem tensorConcat_nil_right (ni : NumericInterface) (a : List ni.Val) :
 
 open NumericSem in
 theorem tensorConcat_length (ni : NumericInterface) (a b : List ni.Val) :
-    (tensorConcat ni a b).length = a.length + b.length := List.length_append a b
+    (tensorConcat ni a b).length = a.length + b.length := List.length_append
 
 open NumericSem in
 def tensorRepeat (ni : NumericInterface) (data : List ni.Val) (n : Nat) : List ni.Val :=
@@ -19746,7 +19746,7 @@ def tensorFill (ni : NumericInterface) (n : Nat) (v : ni.Val) : List ni.Val :=
 
 open NumericSem in
 theorem tensorFill_length (ni : NumericInterface) (n : Nat) (v : ni.Val) :
-    (tensorFill ni n v).length = n := List.length_replicate n v
+    (tensorFill ni n v).length = n := List.length_replicate
 
 open NumericSem in
 def tensorMap (ni : NumericInterface) (f : ni.Val → ni.Val) (data : List ni.Val) :
@@ -19758,7 +19758,7 @@ theorem tensorMap_nil (ni : NumericInterface) (f : ni.Val → ni.Val) :
 
 open NumericSem in
 theorem tensorMap_length (ni : NumericInterface) (f : ni.Val → ni.Val) (data : List ni.Val) :
-    (tensorMap ni f data).length = data.length := List.length_map data f
+    (tensorMap ni f data).length = data.length := List.length_map _
 
 open NumericSem in
 def tensorFilter (ni : NumericInterface) (p : ni.Val → Bool) (data : List ni.Val) :
@@ -19788,7 +19788,7 @@ namespace ListPropertyTheorems
 theorem map_nil {α β : Type} (f : α → β) : List.map f [] = [] := rfl
 
 theorem map_length {α β : Type} (f : α → β) (l : List α) :
-    (l.map f).length = l.length := List.length_map l f
+    (l.map f).length = l.length := List.length_map _
 
 theorem filter_nil {α : Type} (p : α → Bool) : List.filter p [] = [] := rfl
 
@@ -19820,23 +19820,23 @@ theorem zip_nil_right {α β : Type} (l : List α) :
 theorem replicate_zero {α : Type} (v : α) : List.replicate 0 v = [] := rfl
 
 theorem replicate_length {α : Type} (n : Nat) (v : α) :
-    (List.replicate n v).length = n := List.length_replicate n v
+    (List.replicate n v).length = n := List.length_replicate
 
 theorem head_cons {α : Type} [Inhabited α] (x : α) (l : List α) :
     (x :: l).head! = x := rfl
 
 theorem range_zero : List.range 0 = [] := rfl
 
-theorem enum_nil {α : Type} : @List.enum α [] = [] := rfl
+theorem enum_nil {α : Type} : @List.zipIdx α [] 0 = [] := rfl
 
 theorem map_map {α β γ : Type} (f : α → β) (g : β → γ) (l : List α) :
-    (l.map f).map g = l.map (g ∘ f) := List.map_map g f l
+    (l.map f).map g = l.map (g ∘ f) := List.map_map ..
 
 theorem length_append {α : Type} (a b : List α) :
-    (a ++ b).length = a.length + b.length := List.length_append a b
+    (a ++ b).length = a.length + b.length := List.length_append
 
 theorem length_reverse {α : Type} (l : List α) :
-    l.reverse.length = l.length := List.length_reverse l
+    l.reverse.length = l.length := List.length_reverse
 
 theorem take_append_drop {α : Type} (n : Nat) (l : List α) :
     l.take n ++ l.drop n = l := List.take_append_drop n l
@@ -19885,17 +19885,17 @@ namespace RSFFormalizationFinal
 open NumericSem in
 theorem final_concat_len (ni : NumericInterface) (a b : List ni.Val) :
     (ExtendedTensorUtils.tensorConcat ni a b).length = a.length + b.length :=
-  List.length_append a b
+  List.length_append
 
 -- Tensor fill
 open NumericSem in
 theorem final_fill_len (ni : NumericInterface) (n : Nat) (v : ni.Val) :
-    (ExtendedTensorUtils.tensorFill ni n v).length = n := List.length_replicate n v
+    (ExtendedTensorUtils.tensorFill ni n v).length = n := List.length_replicate
 
 -- Tensor map
 open NumericSem in
 theorem final_map_len (ni : NumericInterface) (f : ni.Val → ni.Val) (d : List ni.Val) :
-    (ExtendedTensorUtils.tensorMap ni f d).length = d.length := List.length_map d f
+    (ExtendedTensorUtils.tensorMap ni f d).length = d.length := List.length_map _
 
 -- Tensor foldl nil
 open NumericSem in
@@ -19905,7 +19905,7 @@ theorem final_foldl_nil (ni : NumericInterface) (f : ni.Val → ni.Val → ni.Va
 -- Outer product length
 open NumericSem in
 theorem final_outer_len (ni : NumericInterface) (a b : List ni.Val) :
-    (ExtendedTensorUtils.outerProductFull ni a b).length = a.length := List.length_map a _
+    (ExtendedTensorUtils.outerProductFull ni a b).length = a.length := List.length_map _
 
 -- Element-wise determinism
 open NumericSem in
@@ -20018,15 +20018,15 @@ theorem final_layout_single (d : Nat) : TensorLayoutAnalysis.layoutSize [d] = d 
 -- Weight init (final)
 open NumericSem in
 theorem final_zeros_len (ni : NumericInterface) (n : Nat) :
-    (WeightInitModel.zerosInit ni n).length = n := List.length_replicate n ni.zero
+    (WeightInitModel.zerosInit ni n).length = n := List.length_replicate
 open NumericSem in
 theorem final_ones_len (ni : NumericInterface) (n : Nat) :
-    (WeightInitModel.onesInit ni n).length = n := List.length_replicate n ni.one
+    (WeightInitModel.onesInit ni n).length = n := List.length_replicate
 
 -- Byte ops (final)
 theorem final_bytes_nil : ByteEncodingUtils.bytesToNat [] = 0 := rfl
 theorem final_reverse_len (d : List UInt8) :
-    (ByteEncodingUtils.reverseBytes d).length = d.length := List.length_reverse d
+    (ByteEncodingUtils.reverseBytes d).length = d.length := List.length_reverse
 
 -- Split-merge (final)
 theorem final_split_merge {α : Type} (l : List α) (n : Nat) :
@@ -20167,7 +20167,7 @@ theorem vectorApply_nil (ni : NumericInterface) (f : ni.Val → ni.Val) :
 
 open NumericSem in
 theorem vectorApply_length (ni : NumericInterface) (f : ni.Val → ni.Val) (v : List ni.Val) :
-    (NumericVectorExtended.vectorApply ni f v).length = v.length := List.length_map v f
+    (NumericVectorExtended.vectorApply ni f v).length = v.length := List.length_map _
 
 open NumericSem in
 theorem outerProduct_nil_prop (ni : NumericInterface) (b : List ni.Val) :
@@ -20204,13 +20204,13 @@ open NumericSem ShapeDef LayerCoreDef in
 theorem forwardBatch_count (ni : NumericInterface) (lc : LayerCore ni)
     (ps : List (List ni.Val × List ni.Val)) :
     (ForwardInverseDetailed.forwardBatch ni lc ps).length = ps.length :=
-  List.length_map ps _
+  List.length_map _
 
 open NumericSem ShapeDef LayerCoreDef in
 theorem inverseBatch_count (ni : NumericInterface) (lc : LayerCore ni)
     (ps : List (List ni.Val × List ni.Val)) :
     (ForwardInverseDetailed.inverseBatch ni lc ps).length = ps.length :=
-  List.length_map ps _
+  List.length_map _
 
 open NumericSem ShapeDef LayerCoreDef in
 theorem forwardBatch_nil (ni : NumericInterface) (lc : LayerCore ni) :
@@ -20278,25 +20278,25 @@ theorem list_reverse_nil {α : Type} : @List.reverse α [] = [] := rfl
 theorem list_zip_nil_left {α β : Type} (l : List β) : @List.zip α β [] l = [] := rfl
 theorem list_replicate_zero {α : Type} (v : α) : List.replicate 0 v = [] := rfl
 theorem list_range_zero : List.range 0 = [] := rfl
-theorem list_enum_nil {α : Type} : @List.enum α [] = [] := rfl
+theorem list_enum_nil {α : Type} : @List.zipIdx α [] 0 = [] := rfl
 
 theorem list_map_length {α β : Type} (f : α → β) (l : List α) :
-    (l.map f).length = l.length := List.length_map l f
+    (l.map f).length = l.length := List.length_map _
 
 theorem list_append_length {α : Type} (a b : List α) :
-    (a ++ b).length = a.length + b.length := List.length_append a b
+    (a ++ b).length = a.length + b.length := List.length_append
 
 theorem list_reverse_length {α : Type} (l : List α) :
-    l.reverse.length = l.length := List.length_reverse l
+    l.reverse.length = l.length := List.length_reverse
 
 theorem list_replicate_length {α : Type} (n : Nat) (v : α) :
-    (List.replicate n v).length = n := List.length_replicate n v
+    (List.replicate n v).length = n := List.length_replicate
 
 theorem list_take_append_drop {α : Type} (n : Nat) (l : List α) :
     l.take n ++ l.drop n = l := List.take_append_drop n l
 
 theorem list_map_map {α β γ : Type} (f : α → β) (g : β → γ) (l : List α) :
-    (l.map f).map g = l.map (g ∘ f) := List.map_map g f l
+    (l.map f).map g = l.map (g ∘ f) := List.map_map ..
 
 end NatListFoundation
 
