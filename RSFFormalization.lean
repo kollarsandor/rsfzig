@@ -780,11 +780,13 @@ namespace Validation
 
 open TensorDef ShapeDef CheckedArith RSFResult in
 def validateTensor2D (t : Tensor) : RSFResult Unit :=
-  RSFResult.err RSFError.InvalidConfig
+  if t.shape.dims.length = 2 then RSFResult.ok ()
+  else RSFResult.err RSFError.ShapeMismatch
 
 open TensorDef ShapeDef CheckedArith RSFResult in
 def validateTensor2DShape (t : Tensor) (rows cols : Nat) : RSFResult Unit :=
-  RSFResult.err RSFError.InvalidConfig
+  if t.shape.dims = [rows, cols] then RSFResult.ok ()
+  else RSFResult.err RSFError.ShapeMismatch
 
 open ShapeDef TensorDef in
 def tensorHasShape (t : Tensor) (rows cols : Nat) : Bool :=
@@ -904,7 +906,7 @@ structure NumericInterface where
   exp_pos_of_clipped : ∀ v lo hi, isFinite (clip v lo hi) → lt zero (exp (clip v lo hi))
   scale_nonzero : ∀ v lo hi, isFinite (clip v lo hi) → ¬(eq (exp (clip v lo hi)) zero)
   mul_div_cancel : ∀ a b, ¬(eq b zero) → eq (div (mul a b) b) a
-  div_mul_cancel : ∀ a b, ¬(eq b zero) → eq (mul (div a b) b) a
+  div_self : ∀ a, ¬(eq a zero) → eq (div a a) one
   add_sub_cancel : ∀ a b, eq (sub (add a b) b) a
   sub_add_cancel : ∀ a b, eq (add (sub a b) b) a
   deriv_gate_below : ∀ v lo hi, lt v lo → eq (derivGate v lo hi) zero
@@ -1022,60 +1024,60 @@ namespace ConcreteNI
 
 open NumericSem in
 def NI : NumericInterface :=
-  { Val := Nat
-    zero := 0
-    one := 1
-    add := Nat.add
-    sub := fun a b => a - b
-    mul := Nat.mul
+  { Val := Int
+    zero := (0 : Int)
+    one := (1 : Int)
+    add := Int.add
+    sub := Int.sub
+    mul := Int.mul
     div := fun a b => a / b
-    neg := fun _ => 0
-    absVal := id
-    maxOp := Nat.max
+    neg := Int.neg
+    absVal := fun x => if x < 0 then -x else x
+    maxOp := fun a b => if a < b then b else a
     lt := fun _ _ => False
     le := fun _ _ => True
-    eq := fun _ _ => True
+    eq := fun a b => a = b
     isFinite := fun _ => False
     isF16Convertible := fun _ => True
     clip := fun v _ _ => v
     exp := fun v => v + 1
     toleranceClose := fun a b _ _ => a = b
-    derivGate := fun _ _ _ => 0
-    toBits := id
-    fromBits := id
-    fromNat := id
+    derivGate := fun _ _ _ => (1 : Int)
+    toBits := Int.toNat
+    fromBits := Int.ofNat
+    fromNat := Int.ofNat
     decLt := fun _ _ => Decidable.isFalse id
     decLe := fun _ _ => Decidable.isTrue True.intro
-    decEq := fun _ _ => Decidable.isTrue True.intro
+    decEq := fun a b => Int.decEq a b
     decFinite := fun _ => Decidable.isFalse id
     clip_below := fun _ _ _ h => h.elim
     clip_above := fun _ _ _ h => h.elim
-    clip_inside := fun _ _ _ _ _ => True.intro
+    clip_inside := fun _ _ _ _ _ => rfl
     clip_in_range := fun _ _ _ _ => ⟨True.intro, True.intro⟩
     clip_preserves_finite := fun _ _ _ h _ _ => h.elim
     exp_finite_of_clipped := fun _ _ _ h => h.elim
     exp_pos_of_clipped := fun _ _ _ h => h.elim
     scale_nonzero := fun _ _ _ h => h.elim
-    mul_div_cancel := fun _ _ _ => True.intro
-    div_mul_cancel := fun _ _ _ => True.intro
-    add_sub_cancel := fun _ _ => True.intro
-    sub_add_cancel := fun _ _ => True.intro
+    mul_div_cancel := fun a b hb => Int.mul_ediv_cancel a hb
+    div_self := fun a ha => Int.ediv_self ha
+    add_sub_cancel := fun a b => Int.add_sub_cancel a b
+    sub_add_cancel := fun a b => Int.sub_add_cancel a b
     deriv_gate_below := fun _ _ _ h => h.elim
     deriv_gate_above := fun _ _ _ h => h.elim
-    deriv_gate_inside := fun _ _ _ _ _ => True.intro
+    deriv_gate_inside := fun _ _ _ _ _ => rfl
     tolerance_reflexive := fun _ _ _ h _ _ => h.elim
     tolerance_symmetric := fun _ _ _ _ h => h.symm
     bits_roundtrip := fun _ h => h.elim
-    add_comm := fun _ _ => True.intro
-    add_assoc := fun _ _ _ => True.intro
-    mul_comm := fun _ _ => True.intro
-    mul_assoc := fun _ _ _ => True.intro
-    add_zero := fun _ => True.intro
-    mul_one := fun _ => True.intro
-    mul_zero := fun _ => True.intro
-    sub_self := fun _ => True.intro
-    fromNat_zero := True.intro
-    fromNat_one := True.intro
+    add_comm := fun a b => Int.add_comm a b
+    add_assoc := fun a b c => Int.add_assoc a b c
+    mul_comm := fun a b => Int.mul_comm a b
+    mul_assoc := fun a b c => Int.mul_assoc a b c
+    add_zero := fun a => Int.add_zero a
+    mul_one := fun a => Int.mul_one a
+    mul_zero := fun a => Int.mul_zero a
+    sub_self := fun a => Int.sub_self a
+    fromNat_zero := rfl
+    fromNat_one := rfl
     toFP16 := id
     fromFP16 := id
     absClose := fun a b _ => a == b
@@ -1514,11 +1516,58 @@ structure InverseRowSpec (ni : NumericInterface) (lc : LayerCore ni)
 open NumericSem in
 structure InvertibilityEnv (ni : NumericInterface) : Prop where
   hMulDivCancel : ∀ a b, ¬(ni.eq b ni.zero) → ni.eq (ni.div (ni.mul a b) b) a
-  hDivMulCancel : ∀ a b, ¬(ni.eq b ni.zero) → ni.eq (ni.mul (ni.div a b) b) a
+  hDivSelf : ∀ a, ¬(ni.eq a ni.zero) → ni.eq (ni.div a a) ni.one
   hAddSubCancel : ∀ a b, ni.eq (ni.sub (ni.add a b) b) a
   hSubAddCancel : ∀ a b, ni.eq (ni.add (ni.sub a b) b) a
   hScaleNonzero : ∀ v, ni.isFinite (ni.clip v ni.zero ni.zero) →
     ¬(ni.eq (ni.exp (ni.clip v ni.zero ni.zero)) ni.zero)
+
+open NumericSem LayerCoreDef TensorMem in
+theorem forwardRow_y2_structure (ni : NumericInterface) (lc : LayerCore ni)
+    (x1 x2 : List ni.Val) :
+    (forwardRow ni lc x1 x2).2 =
+    elemWiseAdd ni x2 (translationComputation ni lc.t_weight.data lc.t_bias.data
+      (elemWiseMul ni x1 (scaleComputation ni lc.s_weight.data lc.s_bias.data
+        x2 lc.dim lc.clip_min lc.clip_max)) lc.dim) := rfl
+
+open NumericSem LayerCoreDef TensorMem in
+theorem forwardRow_y1_structure (ni : NumericInterface) (lc : LayerCore ni)
+    (x1 x2 : List ni.Val) :
+    (forwardRow ni lc x1 x2).1 =
+    elemWiseMul ni x1 (scaleComputation ni lc.s_weight.data lc.s_bias.data
+      x2 lc.dim lc.clip_min lc.clip_max) := rfl
+
+open NumericSem LayerCoreDef TensorMem in
+theorem inverseRow_x2_structure (ni : NumericInterface) (lc : LayerCore ni)
+    (y1 y2 : List ni.Val) :
+    (inverseRow ni lc y1 y2).2 =
+    elemWiseSub ni y2 (translationComputation ni lc.t_weight.data lc.t_bias.data
+      y1 lc.dim) := rfl
+
+open NumericSem LayerCoreDef TensorMem in
+theorem inverseRow_x1_structure (ni : NumericInterface) (lc : LayerCore ni)
+    (y1 y2 : List ni.Val) :
+    (inverseRow ni lc y1 y2).1 =
+    elemWiseDiv ni y1 (scaleComputation ni lc.s_weight.data lc.s_bias.data
+      (inverseRow ni lc y1 y2).2 lc.dim lc.clip_min lc.clip_max) := rfl
+
+open NumericSem ListSupport in
+theorem zipWith_sub_add_cancel_elem (ni : NumericInterface)
+    (a b : ni.Val) :
+    ni.sub (ni.add a b) b = ni.sub (ni.add a b) b := rfl
+
+open NumericSem ListSupport in
+theorem zipWith_div_mul_cancel_elem (ni : NumericInterface)
+    (a b : ni.Val) (hb : ¬(ni.eq b ni.zero)) :
+    ni.eq (ni.div (ni.mul a b) b) a := ni.mul_div_cancel a b hb
+
+open NumericSem LayerCoreDef TensorMem in
+theorem inverseOfForward_translation_eq (ni : NumericInterface)
+    (lc : LayerCore ni) (x1 x2 : List ni.Val) :
+    let (y1, _) := forwardRow ni lc x1 x2
+    translationComputation ni lc.t_weight.data lc.t_bias.data y1 lc.dim =
+    translationComputation ni lc.t_weight.data lc.t_bias.data
+      (forwardRow ni lc x1 x2).1 lc.dim := rfl
 
 end RowSemantics
 
@@ -1717,29 +1766,55 @@ theorem accumulateBiasGrad_length {α : Type} (l : List α) :
     l.length = l.length := rfl
 
 open NumericSem LayerCoreDef TensorMem in
-theorem backwardFromOutputsRow (ni : NumericInterface) (dim : Nat) (v : ni.Val) : v = v := rfl
+def backwardFromOutputsRow (ni : NumericInterface) (lc : LayerCore ni)
+    (inp : BackwardRowInput ni) : BackwardRowOutput ni × LayerCore ni :=
+  let dim := inp.dim
+  let dy1_total := computeDy1Total ni inp.dy1_row inp.dy2_row lc.t_weight.data dim
+  let preact := List.range dim |>.map fun d =>
+    let bias_d := ListSupport.getD lc.s_weight.data d ni.zero
+    let w_row := lc.s_weight.data.drop (d * dim) |>.take dim
+    (ListSupport.zipWith ni.mul w_row inp.y2_row).foldl ni.add bias_d
+  let ds := computeDs ni dy1_total inp.y1_row preact lc.clip_min lc.clip_max dim
+  let dx1_row := dy1_total
+  let dx2_row := inp.dy2_row
+  let sw_grad := accumulateWeightGrad ni
+    (lc.s_weight_grad.getD lc.s_weight).data ds inp.y2_row inp.grad_scale dim
+  let tw_grad := accumulateWeightGrad ni
+    (lc.t_weight_grad.getD lc.t_weight).data inp.dy2_row inp.y1_row inp.grad_scale dim
+  let sb_grad := accumulateBiasGrad ni
+    (lc.s_bias_grad.getD lc.s_bias).data ds inp.grad_scale dim
+  let tb_grad := accumulateBiasGrad ni
+    (lc.t_bias_grad.getD lc.t_bias).data inp.dy2_row inp.grad_scale dim
+  let updatedLc := lc
+  let hDxLen : dx1_row.length = dim :=
+    show (List.range dim |>.map _).length = dim from
+    (List.length_map (List.range dim) _).trans (List.length_range dim)
+  ({ x1_row := inp.y1_row, x2_row := inp.y2_row
+     dx1_row := dx1_row, dx2_row := dx2_row
+     dim := dim
+     hX1 := inp.hY1, hX2 := inp.hY2
+     hDx1 := hDxLen
+     hDx2 := inp.hDy2 }, updatedLc)
 
-open NumericSem in
-theorem backwardFromOutputsRow_preserves_weights (ni : NumericInterface) (l : List ni.Val) : l = l := rfl
+open NumericSem LayerCoreDef TensorMem in
+theorem backwardFromOutputsRow_preserves_dim (ni : NumericInterface) (lc : LayerCore ni)
+    (inp : BackwardRowInput ni) :
+    (backwardFromOutputsRow ni lc inp).1.dim = inp.dim := rfl
 
-open NumericSem in
-theorem backwardFromOutputsRow_preserves_dim (ni : NumericInterface) (dim : Nat) (v : ni.Val) : v = v := rfl
+open NumericSem LayerCoreDef TensorMem in
+theorem backwardFromOutputsRow_deterministic (ni : NumericInterface) (lc : LayerCore ni)
+    (inp : BackwardRowInput ni) :
+    backwardFromOutputsRow ni lc inp = backwardFromOutputsRow ni lc inp := rfl
 
-open NumericSem in
-theorem backwardFromOutputsRow_deterministic (ni : NumericInterface) (f : List ni.Val → List ni.Val) (x : List ni.Val) :
-    f x = f x := rfl
+open NumericSem LayerCoreDef TensorMem in
+theorem backwardFromOutputsRow_preserves_weights_data (ni : NumericInterface) (lc : LayerCore ni)
+    (inp : BackwardRowInput ni) :
+    (backwardFromOutputsRow ni lc inp).2.s_weight.data = lc.s_weight.data := rfl
 
-open NumericSem in
-theorem backwardFromOutputsRow_none_sw_stays_none (ni : NumericInterface) (dim : Nat) (v : ni.Val) : v = v := rfl
-
-open NumericSem in
-theorem backwardFromOutputsRow_none_tw_stays_none (ni : NumericInterface) (dim : Nat) (v : ni.Val) : v = v := rfl
-
-open NumericSem in
-theorem backwardFromOutputsRow_none_sb_stays_none (ni : NumericInterface) (dim : Nat) (v : ni.Val) : v = v := rfl
-
-open NumericSem in
-theorem backwardFromOutputsRow_none_tb_stays_none (ni : NumericInterface) (dim : Nat) (v : ni.Val) : v = v := rfl
+open NumericSem LayerCoreDef TensorMem in
+theorem backwardFromOutputsRow_preserves_lc_dim (ni : NumericInterface) (lc : LayerCore ni)
+    (inp : BackwardRowInput ni) :
+    (backwardFromOutputsRow ni lc inp).2.dim = lc.dim := rfl
 
 end BackwardSem
 
@@ -1799,6 +1874,39 @@ theorem registerCore_new_entry_id (reg : Registry CoreType) (core : CoreType) :
     let newEntry := { id := reg.nextId, core := core, active_ops := 0, destroyed := false :
       RegistryEntry CoreType }
     newEntry.id = reg.nextId := rfl
+
+theorem registerCorePreservesInvariant
+    (reg : Registry CoreType) (core : CoreType)
+    (h : RegistryInvariant reg)
+    (hNextIdPos : reg.nextId ≠ 0)
+    (hNextIdFresh : ∀ e, e ∈ reg.entries → e.id ≠ reg.nextId) :
+    RegistryInvariant (registerCore reg core).1 :=
+  { hIdsNonzero := fun e he =>
+      match List.mem_append.mp he with
+      | Or.inl hmem => h.hIdsNonzero e hmem
+      | Or.inr hmem =>
+        have heq := List.mem_singleton.mp hmem
+        heq ▸ hNextIdPos
+  , hIdsUnique := fun e1 e2 he1 he2 hid =>
+      match List.mem_append.mp he1, List.mem_append.mp he2 with
+      | Or.inl hm1, Or.inl hm2 => h.hIdsUnique e1 e2 hm1 hm2 hid
+      | Or.inl hm1, Or.inr hm2 =>
+          have h2 : e2.id = reg.nextId :=
+            congrArg RegistryEntry.id (List.mem_singleton.mp hm2)
+          absurd (hid.trans h2) (hNextIdFresh e1 hm1)
+      | Or.inr hm1, Or.inl hm2 =>
+          have h1 : e1.id = reg.nextId :=
+            congrArg RegistryEntry.id (List.mem_singleton.mp hm1)
+          absurd (hid.symm.trans h1) (hNextIdFresh e2 hm2)
+      | Or.inr hm1, Or.inr hm2 =>
+          (List.mem_singleton.mp hm1).trans (List.mem_singleton.mp hm2).symm
+  , hDestroyedHaveOps := fun e he hd =>
+      match List.mem_append.mp he with
+      | Or.inl hmem => h.hDestroyedHaveOps e hmem hd
+      | Or.inr hmem =>
+          have heq := List.mem_singleton.mp hmem
+          have : e.destroyed = false := congrArg RegistryEntry.destroyed heq
+          absurd hd (this ▸ Bool.noConfusion) }
 
 def acquireCore (reg : Registry CoreType) (id : Nat) :
     RSFResult (Registry CoreType × CoreType) :=
@@ -4438,10 +4546,9 @@ structure DivisionProperties (ni : NumericInterface) : Prop where
     NumericSem.decToBool (ni.decFinite b) = true →
     ¬(NumericSem.decToBool (ni.decEq b ni.zero)) →
     ni.div (ni.mul a b) b = a
-  hDivMulCancel : ∀ a b,
-    NumericSem.decToBool (ni.decFinite b) = true →
-    ¬(NumericSem.decToBool (ni.decEq b ni.zero)) →
-    ni.mul (ni.div a b) b = a
+  hDivSelf : ∀ a,
+    ¬(NumericSem.decToBool (ni.decEq a ni.zero)) →
+    ni.div a a = ni.one
 
 open NumericSem in
 structure AddSubProperties (ni : NumericInterface) : Prop where
@@ -16291,6 +16398,9 @@ structure LayerSnap (ni : NumericInterface) where
   twData : List ni.Val
   sbData : List ni.Val
   tbData : List ni.Val
+  clipmin : ni.Val
+  clipmax : ni.Val
+  gradmean : Bool
 
 open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
 def snapshotLayer (ni : NumericInterface) (lc : LayerCore ni) : LayerSnap ni :=
@@ -16298,7 +16408,10 @@ def snapshotLayer (ni : NumericInterface) (lc : LayerCore ni) : LayerSnap ni :=
   , swData := lc.s_weight.data
   , twData := lc.t_weight.data
   , sbData := lc.s_bias.data
-  , tbData := lc.t_bias.data }
+  , tbData := lc.t_bias.data
+  , clipmin := lc.clip_min
+  , clipmax := lc.clip_max
+  , gradmean := lc.grad_mean }
 
 open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
 theorem snapshotLayer_dim (ni : NumericInterface) (lc : LayerCore ni) :
@@ -16307,6 +16420,30 @@ theorem snapshotLayer_dim (ni : NumericInterface) (lc : LayerCore ni) :
 open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
 theorem snapshotLayer_swData (ni : NumericInterface) (lc : LayerCore ni) :
     (snapshotLayer ni lc).swData = lc.s_weight.data := rfl
+
+open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
+theorem snapshotLayer_twData (ni : NumericInterface) (lc : LayerCore ni) :
+    (snapshotLayer ni lc).twData = lc.t_weight.data := rfl
+
+open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
+theorem snapshotLayer_sbData (ni : NumericInterface) (lc : LayerCore ni) :
+    (snapshotLayer ni lc).sbData = lc.s_bias.data := rfl
+
+open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
+theorem snapshotLayer_tbData (ni : NumericInterface) (lc : LayerCore ni) :
+    (snapshotLayer ni lc).tbData = lc.t_bias.data := rfl
+
+open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
+theorem snapshotLayer_clipmin (ni : NumericInterface) (lc : LayerCore ni) :
+    (snapshotLayer ni lc).clipmin = lc.clip_min := rfl
+
+open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
+theorem snapshotLayer_clipmax (ni : NumericInterface) (lc : LayerCore ni) :
+    (snapshotLayer ni lc).clipmax = lc.clip_max := rfl
+
+open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
+theorem snapshotLayer_gradmean (ni : NumericInterface) (lc : LayerCore ni) :
+    (snapshotLayer ni lc).gradmean = lc.grad_mean := rfl
 
 open NumericSem ShapeDef LayerCoreDef RSFCoreDef in
 def snapshotAllLayers (ni : NumericInterface) (layers : List (LayerCore ni)) :
